@@ -247,7 +247,7 @@ func (p *Provider) loadIngresses(k8sClient Client) (*types.Configuration, error)
 
 				templates := map[string]string{
 					"$namespace": i.Namespace,
-					"$service_name:": pa.Backend.ServiceName,
+					"$service_name": pa.Backend.ServiceName,
 				}
 
 				if priority > 0 {
