@@ -239,10 +239,12 @@ func (p *Provider) loadIngresses(k8sClient Client) (*types.Configuration, error)
 					continue
 				}
 
-				baseName := r.Host + pa.Path
+				baseNameFe := pa.Backend.ServiceName + "-" + r.Host + pa.Path
 
-				if len(baseName) == 0 {
-					baseName = pa.Backend.ServiceName
+				baseNameBe := r.Host + pa.Path
+				if len(baseNameBe) == 0 {
+					log.Errorf("baseNameBe = %s", baseNameBe)
+					baseNameBe = pa.Backend.ServiceName
 				}
 
 				templates := map[string]string{
@@ -252,11 +254,16 @@ func (p *Provider) loadIngresses(k8sClient Client) (*types.Configuration, error)
 				}
 
 				if priority > 0 {
-					baseName = strconv.Itoa(priority) + "-" + baseName
+					baseNameBe = strconv.Itoa(priority) + "-" + baseNameBe
+					baseNameFe = strconv.Itoa(priority) + "-" + baseNameFe
 				}
 
-				if _, exists := templateObjects.Backends[baseName]; !exists {
-					templateObjects.Backends[baseName] = &types.Backend{
+				log.Errorf("baseNameBe = %s", baseNameBe)
+				log.Errorf("baseNameFe = %s", baseNameFe)
+				log.Error("----------")
+
+				if _, exists := templateObjects.Backends[baseNameBe]; !exists {
+					templateObjects.Backends[baseNameBe] = &types.Backend{
 						Servers: make(map[string]types.Server),
 						LoadBalancer: &types.LoadBalancer{
 							Method: "wrr",
@@ -267,12 +274,12 @@ func (p *Provider) loadIngresses(k8sClient Client) (*types.Configuration, error)
 				annotationAuthRealm := getAnnotationName(i.Annotations, annotationKubernetesAuthRealm)
 				if realm := i.Annotations[annotationAuthRealm]; realm != "" && realm != traefikDefaultRealm {
 					log.Errorf("Value for annotation %q on ingress %s/%s invalid: no realm customization supported", annotationAuthRealm, i.Namespace, i.Name)
-					delete(templateObjects.Backends, baseName)
+					delete(templateObjects.Backends, baseNameBe)
 					continue
 				}
 
 				var frontend *types.Frontend
-				if fe, exists := templateObjects.Frontends[baseName]; exists {
+				if fe, exists := templateObjects.Frontends[baseNameFe]; exists {
 					frontend = fe
 				} else {
 					auth, err := getAuthConfig(i, k8sClient)
@@ -286,14 +293,14 @@ func (p *Provider) loadIngresses(k8sClient Client) (*types.Configuration, error)
 					entryPoints := getSliceStringValue(i.Annotations, annotationKubernetesFrontendEntryPoints)
 
 					frontend = &types.Frontend{
-						Backend:           baseName,
+						Backend:           baseNameBe,
 						PassHostHeader:    passHostHeader,
 						PassTLSCert:       passTLSCert,
 						PassTLSClientCert: getPassTLSClientCert(i),
 						Routes:            make(map[string]types.Route),
 						Priority:          priority,
 						WhiteList:         getWhiteList(i),
-						Redirect:          getFrontendRedirect(i, baseName, pa.Path),
+						Redirect:          getFrontendRedirect(i, baseNameFe, pa.Path),
 						EntryPoints:       entryPoints,
 						Headers:           getHeader(templates, i),
 						Errors:            getErrorPages(i),
@@ -339,12 +346,12 @@ func (p *Provider) loadIngresses(k8sClient Client) (*types.Configuration, error)
 					}
 				}
 
-				templateObjects.Frontends[baseName] = frontend
-				templateObjects.Backends[baseName].CircuitBreaker = getCircuitBreaker(service)
-				templateObjects.Backends[baseName].LoadBalancer = getLoadBalancer(service)
-				templateObjects.Backends[baseName].MaxConn = getMaxConn(service)
-				templateObjects.Backends[baseName].Buffering = getBuffering(service)
-				templateObjects.Backends[baseName].ResponseForwarding = getResponseForwarding(service)
+				templateObjects.Frontends[baseNameFe] = frontend
+				templateObjects.Backends[baseNameBe].CircuitBreaker = getCircuitBreaker(service)
+				templateObjects.Backends[baseNameBe].LoadBalancer = getLoadBalancer(service)
+				templateObjects.Backends[baseNameBe].MaxConn = getMaxConn(service)
+				templateObjects.Backends[baseNameBe].Buffering = getBuffering(service)
+				templateObjects.Backends[baseNameBe].ResponseForwarding = getResponseForwarding(service)
 
 				protocol := label.DefaultProtocol
 
@@ -371,7 +378,7 @@ func (p *Provider) loadIngresses(k8sClient Client) (*types.Configuration, error)
 								url = fmt.Sprintf("%s:%d", url, port.Port)
 							}
 							externalNameServiceWeight := weightAllocator.getWeight(r.Host, pa.Path, pa.Backend.ServiceName)
-							templateObjects.Backends[baseName].Servers[url] = types.Server{
+							templateObjects.Backends[baseNameBe].Servers[url] = types.Server{
 								URL:    url,
 								Weight: externalNameServiceWeight,
 							}
@@ -405,7 +412,7 @@ func (p *Provider) loadIngresses(k8sClient Client) (*types.Configuration, error)
 										name = address.TargetRef.Name
 									}
 
-									templateObjects.Backends[baseName].Servers[name] = types.Server{
+									templateObjects.Backends[baseNameBe].Servers[name] = types.Server{
 										URL:    url,
 										Weight: weightAllocator.getWeight(r.Host, pa.Path, pa.Backend.ServiceName),
 									}
