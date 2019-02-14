@@ -97,7 +97,7 @@ func GetSliceStringValue(labels map[string]string, labelName string) []string {
 }
 
 // ParseMapValue get Map value for a label value
-func ParseMapValue(labelName, values string) map[string]string {
+func ParseMapValue(templates map[string]string, labelName, values string) map[string]string {
 	mapValue := make(map[string]string)
 
 	for _, parts := range strings.Split(values, mapEntrySeparator) {
@@ -105,7 +105,13 @@ func ParseMapValue(labelName, values string) map[string]string {
 		if len(pair) != 2 {
 			log.Warnf("Could not load %q: %q, skipping...", labelName, parts)
 		} else {
-			mapValue[http.CanonicalHeaderKey(strings.TrimSpace(pair[0]))] = strings.TrimSpace(pair[1])
+			value := pair[1]
+			for k, v := range templates {
+				if strings.Contains(value, k) {
+					value = strings.Replace(value, k, v, -1)
+				}
+			}
+			mapValue[http.CanonicalHeaderKey(strings.TrimSpace(pair[0]))] = strings.TrimSpace(value)
 		}
 	}
 
@@ -116,8 +122,7 @@ func ParseMapValue(labelName, values string) map[string]string {
 	return mapValue
 }
 
-// GetMapValue get Map value associated to a label
-func GetMapValue(labels map[string]string, labelName string) map[string]string {
+func GetMapValueTemplated(templates map[string]string, labels map[string]string, labelName string) map[string]string {
 	if values, ok := labels[labelName]; ok {
 
 		if len(values) == 0 {
@@ -125,10 +130,15 @@ func GetMapValue(labels map[string]string, labelName string) map[string]string {
 			return nil
 		}
 
-		return ParseMapValue(labelName, values)
+		return ParseMapValue(templates, labelName, values)
 	}
 
 	return nil
+}
+
+// GetMapValue get Map value associated to a label
+func GetMapValue(labels map[string]string, labelName string) map[string]string {
+	return GetMapValueTemplated(nil, labels, labelName)
 }
 
 // GetStringMultipleStrict get multiple string values associated to several labels
