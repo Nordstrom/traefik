@@ -116,7 +116,12 @@ func getSliceStringValue(annotations map[string]string, annotation string) []str
 	return label.GetSliceStringValue(annotations, annotationName)
 }
 
-func getMapValue(annotations map[string]string, annotation string) map[string]string {
+
+func getMapValueTemplated(templates map[string]string, annotations map[string]string, annotation string) map[string]string {
 	annotationName := getAnnotationName(annotations, annotation)
-	return label.GetMapValue(annotations, annotationName)
+	return label.GetMapValueTemplated(templates, annotations, annotationName)
+}
+
+func getMapValue(annotations map[string]string, annotation string) map[string]string {
+	return getMapValueTemplated(nil, annotations, annotation)
 }

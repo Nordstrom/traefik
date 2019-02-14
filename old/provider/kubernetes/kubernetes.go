@@ -245,6 +245,11 @@ func (p *Provider) loadIngresses(k8sClient Client) (*types.Configuration, error)
 					baseName = pa.Backend.ServiceName
 				}
 
+				templates := map[string]string{
+					"$namespace": i.Namespace,
+					"$service_name:": pa.Backend.ServiceName,
+				}
+
 				if priority > 0 {
 					baseName = strconv.Itoa(priority) + "-" + baseName
 				}
@@ -289,7 +294,7 @@ func (p *Provider) loadIngresses(k8sClient Client) (*types.Configuration, error)
 						WhiteList:         getWhiteList(i),
 						Redirect:          getFrontendRedirect(i, baseName, pa.Path),
 						EntryPoints:       entryPoints,
-						Headers:           getHeader(i),
+						Headers:           getHeader(templates, i),
 						Errors:            getErrorPages(i),
 						RateLimit:         getRateLimit(i),
 						Auth:              auth,
@@ -554,7 +559,7 @@ func (p *Provider) addGlobalBackend(cl Client, i *extensionsv1beta1.Ingress, tem
 		WhiteList:         getWhiteList(i),
 		Redirect:          getFrontendRedirect(i, defaultFrontendName, "/"),
 		EntryPoints:       entryPoints,
-		Headers:           getHeader(i),
+		Headers:           getHeader(nil, i),
 		Errors:            getErrorPages(i),
 		RateLimit:         getRateLimit(i),
 	}
@@ -1065,9 +1070,9 @@ func getStickiness(service *corev1.Service) *types.Stickiness {
 	return nil
 }
 
-func getHeader(i *extensionsv1beta1.Ingress) *types.Headers {
+func getHeader(templates map[string]string, i *extensionsv1beta1.Ingress) *types.Headers {
 	headers := &types.Headers{
-		CustomRequestHeaders:    getMapValue(i.Annotations, annotationKubernetesCustomRequestHeaders),
+		CustomRequestHeaders:    getMapValueTemplated(templates, i.Annotations, annotationKubernetesCustomRequestHeaders),
 		CustomResponseHeaders:   getMapValue(i.Annotations, annotationKubernetesCustomResponseHeaders),
 		AllowedHosts:            getSliceStringValue(i.Annotations, annotationKubernetesAllowedHosts),
 		HostsProxyHeaders:       getSliceStringValue(i.Annotations, annotationKubernetesProxyHeaders),
