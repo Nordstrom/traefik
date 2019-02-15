@@ -3,6 +3,7 @@ package middlewares
 // Middleware based on https://github.com/unrolled/secure
 
 import (
+	"github.com/containous/traefik/log"
 	"net/http"
 
 	"github.com/containous/traefik/types"
@@ -14,6 +15,8 @@ type HeaderOptions struct {
 	CustomRequestHeaders map[string]string
 	// If Custom response headers are set, these will be added to the ResponseWriter
 	CustomResponseHeaders map[string]string
+	ServiceMapping        *types.CowMap
+	CustomServiceHeaders  map[string]map[string]string
 }
 
 // HeaderStruct is a middleware that helps setup a few basic security features. A single headerOptions struct can be
@@ -24,7 +27,8 @@ type HeaderStruct struct {
 }
 
 // NewHeaderFromStruct constructs a new header instance from supplied frontend header struct.
-func NewHeaderFromStruct(headers *types.Headers) *HeaderStruct {
+func NewHeaderFromStruct(front *types.Frontend) *HeaderStruct {
+	headers := front.Headers
 	if headers == nil || !headers.HasCustomHeadersDefined() {
 		return nil
 	}
@@ -33,6 +37,8 @@ func NewHeaderFromStruct(headers *types.Headers) *HeaderStruct {
 		opt: HeaderOptions{
 			CustomRequestHeaders:  headers.CustomRequestHeaders,
 			CustomResponseHeaders: headers.CustomResponseHeaders,
+			ServiceMapping:        front.ServiceMapping,
+			CustomServiceHeaders:  front.Headers.CustomServiceHeaders,
 		},
 	}
 }
@@ -52,6 +58,19 @@ func (s *HeaderStruct) ModifyRequestHeaders(r *http.Request) {
 		if value == "" {
 			r.Header.Del(header)
 		} else {
+			r.Header.Set(header, value)
+		}
+	}
+	serviceName := s.opt.ServiceMapping.Get(r.URL.Hostname())
+	log.Infof("request service name %s url %v", serviceName, r.URL)
+	log.Infof("request host name %s", r.URL.Hostname())
+	s.opt.ServiceMapping.LogIt()
+	for header, value := range s.opt.CustomServiceHeaders[serviceName] {
+		if value == "" {
+			log.Infof("deleting header key: %s", header)
+			r.Header.Del(header)
+		} else {
+			log.Infof("adding header key: %s - value: %s", header, value)
 			r.Header.Set(header, value)
 		}
 	}

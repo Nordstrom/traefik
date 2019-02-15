@@ -268,6 +268,7 @@ func (p *Provider) loadIngresses(k8sClient Client) (*types.Configuration, error)
 				var frontend *types.Frontend
 				if fe, exists := templateObjects.Frontends[baseName]; exists {
 					frontend = fe
+					//todo: (clean up service mapping ?)
 				} else {
 					auth, err := getAuthConfig(i, k8sClient)
 					if err != nil {
@@ -333,12 +334,15 @@ func (p *Provider) loadIngresses(k8sClient Client) (*types.Configuration, error)
 					}
 				}
 
+				sm := types.NewCowMap()
 				templateObjects.Frontends[baseName] = frontend
+				templateObjects.Frontends[baseName].ServiceMapping = &sm
 				templateObjects.Backends[baseName].CircuitBreaker = getCircuitBreaker(service)
 				templateObjects.Backends[baseName].LoadBalancer = getLoadBalancer(service)
 				templateObjects.Backends[baseName].MaxConn = getMaxConn(service)
 				templateObjects.Backends[baseName].Buffering = getBuffering(service)
 				templateObjects.Backends[baseName].ResponseForwarding = getResponseForwarding(service)
+				templateObjects.Backends[baseName].ServiceMapping = &sm
 
 				protocol := label.DefaultProtocol
 
@@ -365,6 +369,8 @@ func (p *Provider) loadIngresses(k8sClient Client) (*types.Configuration, error)
 								url = fmt.Sprintf("%s:%d", url, port.Port)
 							}
 							externalNameServiceWeight := weightAllocator.getWeight(r.Host, pa.Path, pa.Backend.ServiceName)
+							//log.Infof("service mapping %s to %s", service.Spec.ExternalName, pa.Backend.ServiceName)
+							frontend.ServiceMapping.Set(service.Spec.ExternalName, pa.Backend.ServiceName)
 							templateObjects.Backends[baseName].Servers[url] = types.Server{
 								URL:    url,
 								Weight: externalNameServiceWeight,
@@ -398,6 +404,8 @@ func (p *Provider) loadIngresses(k8sClient Client) (*types.Configuration, error)
 									if address.TargetRef != nil && address.TargetRef.Name != "" {
 										name = address.TargetRef.Name
 									}
+									//log.Infof("service mapping %s to %s", address.IP, pa.Backend.ServiceName)
+									frontend.ServiceMapping.Set(address.IP, pa.Backend.ServiceName)
 
 									templateObjects.Backends[baseName].Servers[name] = types.Server{
 										URL:    url,
@@ -1061,8 +1069,10 @@ func getStickiness(service *corev1.Service) *types.Stickiness {
 
 func getHeader(i *extensionsv1beta1.Ingress) *types.Headers {
 	headers := &types.Headers{
-		CustomRequestHeaders:    getMapValue(i.Annotations, annotationKubernetesCustomRequestHeaders),
-		CustomResponseHeaders:   getMapValue(i.Annotations, annotationKubernetesCustomResponseHeaders),
+		CustomRequestHeaders:  getMapValue(i.Annotations, annotationKubernetesCustomRequestHeaders),
+		CustomResponseHeaders: getMapValue(i.Annotations, annotationKubernetesCustomResponseHeaders),
+		CustomServiceHeaders:  getCustomServiceHeaders(i.Annotations),
+
 		AllowedHosts:            getSliceStringValue(i.Annotations, annotationKubernetesAllowedHosts),
 		HostsProxyHeaders:       getSliceStringValue(i.Annotations, annotationKubernetesProxyHeaders),
 		SSLForceHost:            getBoolValue(i.Annotations, annotationKubernetesSSLForceHost, false),

@@ -82,7 +82,7 @@ func (s *Server) buildMiddlewares(frontendName string, frontend *types.Frontend,
 	}
 
 	// Header
-	headerMiddleware := middlewares.NewHeaderFromStruct(frontend.Headers)
+	headerMiddleware := middlewares.NewHeaderFromStruct(frontend)
 	if headerMiddleware != nil {
 		log.Debugf("Adding header middleware for frontend %s", frontendName)
 

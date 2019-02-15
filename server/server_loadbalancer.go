@@ -197,6 +197,8 @@ func (s *Server) configureLBServers(lb healthcheck.BalancerHandler, backend *typ
 		if err := lb.UpsertServer(u, roundrobin.Weight(srv.Weight)); err != nil {
 			return fmt.Errorf("error adding server %s to load balancer: %v", srv.URL, err)
 		}
+		//todo: link Backend with url
+		//backend.ServiceMapping.Set()
 
 		s.metricsRegistry.BackendServerUpGauge().With("backend", backendName, "url", srv.URL).Set(1)
 	}

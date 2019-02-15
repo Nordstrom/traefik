@@ -150,6 +150,7 @@ func (hc *HealthCheck) checkBackend(backend *BackendConfig) {
 		if err := checkHealth(url, backend); err != nil {
 			log.Warnf("Health check failed: Remove from server list. Backend: %q URL: %q Reason: %s", backend.name, url.String(), err)
 			backend.LB.RemoveServer(url)
+			//todo: (WK) unlink backend from url
 			backend.disabledURLs = append(backend.disabledURLs, url)
 			serverUpMetricValue = 0
 		}

@@ -29,6 +29,7 @@ type Backend struct {
 	HealthCheck        *HealthCheck        `json:"healthCheck,omitempty"`
 	Buffering          *Buffering          `json:"buffering,omitempty"`
 	ResponseForwarding *ResponseForwarding `json:"forwardingResponse,omitempty"`
+	ServiceMapping     *CowMap
 }
 
 // ResponseForwarding holds configuration for the forward of the response
@@ -129,6 +130,7 @@ type RateLimit struct {
 type Headers struct {
 	CustomRequestHeaders  map[string]string `json:"customRequestHeaders,omitempty"`
 	CustomResponseHeaders map[string]string `json:"customResponseHeaders,omitempty"`
+	CustomServiceHeaders  map[string]map[string]string
 
 	AllowedHosts            []string          `json:"allowedHosts,omitempty"`
 	HostsProxyHeaders       []string          `json:"hostsProxyHeaders,omitempty"`
@@ -199,6 +201,33 @@ type Frontend struct {
 	RateLimit            *RateLimit            `json:"ratelimit,omitempty"`
 	Redirect             *Redirect             `json:"redirect,omitempty"`
 	Auth                 *Auth                 `json:"auth,omitempty"`
+	ServiceMapping       *CowMap
+}
+
+type CowMap struct {
+	inner map[string]string
+}
+
+func NewCowMap() CowMap {
+	return CowMap{map[string]string{}}
+}
+
+func (c CowMap) Get(key string) string {
+	return c.inner[key]
+}
+
+func (c CowMap) LogIt() {
+	log.Infof("cows in pasture %v = ", c.inner)
+}
+
+func (c CowMap) Set(key, value string) {
+	//todo: (WK) lock w/ mutex
+	n := map[string]string{}
+	for k, v := range c.inner {
+		n[k] = v
+	}
+	n[key] = value
+	c.inner = n
 }
 
 // Hash returns the hash value of a Frontend struct.

@@ -1,6 +1,8 @@
 package kubernetes
 
 import (
+	"github.com/containous/traefik/log"
+	"gopkg.in/yaml.v2"
 	"strconv"
 
 	"github.com/containous/traefik/provider/label"
@@ -50,6 +52,7 @@ const (
 	annotationKubernetesHSTSMaxAge              = "ingress.kubernetes.io/hsts-max-age"
 	annotationKubernetesHSTSIncludeSubdomains   = "ingress.kubernetes.io/hsts-include-subdomains"
 	annotationKubernetesCustomRequestHeaders    = "ingress.kubernetes.io/custom-request-headers"
+	annotationKubernetesServiceHeaders          = "ingress.kubernetes.io/service-custom-request-headers"
 	annotationKubernetesCustomResponseHeaders   = "ingress.kubernetes.io/custom-response-headers"
 	annotationKubernetesAllowedHosts            = "ingress.kubernetes.io/allowed-hosts"
 	annotationKubernetesProxyHeaders            = "ingress.kubernetes.io/proxy-headers"
@@ -135,6 +138,26 @@ func getInt64Value(annotations map[string]string, annotation string, defaultValu
 func getSliceStringValue(annotations map[string]string, annotation string) []string {
 	annotationName := getAnnotationName(annotations, annotation)
 	return label.GetSliceStringValue(annotations, annotationName)
+}
+
+func getCustomServiceHeaders(annotations map[string]string) map[string]map[string]string {
+	headers := make(map[string]string)
+	annotationName := getAnnotationName(annotations, annotationKubernetesServiceHeaders)
+	serviceNameToHeaders := make(map[string]map[string]string)
+	if err := yaml.Unmarshal([]byte(annotations[annotationName]), headers); err != nil {
+		log.Errorf("error parsing custom service yaml %v", err)
+		return serviceNameToHeaders
+	}
+	//log.Infof("found headers: %v", headers)
+
+	for k, v := range headers {
+		m := label.ParseMapValue(k, v)
+		//nk := namespace + "/" + k
+		//log.Infof("adding service header - %s : %s", k, m)
+		serviceNameToHeaders[k] = m
+	}
+
+	return serviceNameToHeaders
 }
 
 func getMapValue(annotations map[string]string, annotation string) map[string]string {
